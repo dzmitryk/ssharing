@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
-	"rsa"
 	"strconv"
 	"strings"
 
@@ -211,6 +211,28 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 	}
 }
 
+func listenHttp(addr string) {
+	http.HandleFunc("/", handleHttpRequest)
+
+	err := http.ListenAndServe(addr, nil)
+
+	if err != nil {
+		panic("Couldn't start http server")
+	}
+}
+
+func handleHttpRequest(writer http.ResponseWriter, request *http.Request) {
+	path := strings.Split(request.URL.Path, "/")
+
+	if len(path) == 2 {
+		user := path[0]
+		file := path[1]
+
+	}
+
+	fmt.Fprintf(writer, path)
+}
+
 func main() {
 
 	// prepare directory layout
@@ -234,5 +256,6 @@ func main() {
 
 	config.AddHostKey(private)
 
-	listenSsh(":2222", config)
+	go listenSsh(":2222", config)
+	listenHttp(":8080")
 }
