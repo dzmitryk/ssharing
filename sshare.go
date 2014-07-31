@@ -222,15 +222,19 @@ func listenHttp(addr string) {
 }
 
 func handleHttpRequest(writer http.ResponseWriter, request *http.Request) {
-	path := strings.Split(request.URL.Path, "/")
+	path := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
 
 	if len(path) == 2 {
-		user := path[0]
-		file := path[1]
+		filePath := fmt.Sprintf("%s%s/%s", _USERS_DATA_ROOT, path[0], path[1])
 
+		fmt.Fprintf(writer, filePath)
+
+		if _, err := os.Stat(filePath); err == nil {
+
+		}
+	} else {
+		http.NotFound(writer, request)
 	}
-
-	fmt.Fprintf(writer, path)
 }
 
 func main() {
