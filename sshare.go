@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	_KEYS_DIR        = "keys/"
-	_USERS_DIR       = "users/"
-	_USERS_DATA_ROOT = "userdata/"
+	_KEYS_DIR  = "keys/"
+	_USERS_DIR = "users/"
 )
 
 type Upload struct {
@@ -49,8 +48,6 @@ func newUser(name string, pass []byte) {
 	if err != nil {
 		panic("Failed to write user data file")
 	}
-
-	os.Mkdir(_USERS_DATA_ROOT+name, 0744)
 }
 
 func findUser(name string) map[string]string {
@@ -249,7 +246,6 @@ func main() {
 	// prepare directory layout
 	os.Mkdir(_KEYS_DIR, 0744)
 	os.Mkdir(_USERS_DIR, 0744)
-	os.Mkdir(_USERS_DATA_ROOT, 0744)
 
 	config := &ssh.ServerConfig{
 		PasswordCallback: passwordCallback,
