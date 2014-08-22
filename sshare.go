@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -21,6 +21,14 @@ const (
 	_USERS_DIR       = "users/"
 	_USERS_DATA_ROOT = "userdata/"
 )
+
+type Upload struct {
+	path     string
+	writer   chan<- http.ResponseWriter
+	complete <-chan bool
+}
+
+var uploadMap map[string]Upload
 
 func newUser(name string, pass []byte) {
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
@@ -107,7 +115,7 @@ func handleScpFileTransfer(channel ssh.Channel, destDir string) error {
 
 		code := string([]rune(cmdParts[0])[0])
 
-		// handle only single file transfer: scp command will start with "C"
+		// handle only single file transfer - scp command starting with "C"
 		if code == "C" {
 			// for now ignoring file mode
 
@@ -121,37 +129,33 @@ func handleScpFileTransfer(channel ssh.Channel, destDir string) error {
 			// file name of transferred file
 			fileName := cmdParts[2]
 
-			file, err := os.Create(destDir + "/" + fileName)
-			defer file.Close()
+			path := destDir + "/" + fileName
 
-			if err != nil {
-				panic(err)
-			}
+			writer := make(chan http.ResponseWriter)
+			complete := make(chan bool)
+
+			uploadMap[path] = Upload{path, writer, complete}
+
+			w := <-writer
+
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Length", strconv.Itoa(fileLength))
 
 			channel.Write([]byte{0})
 
-			writer := bufio.NewWriter(file)
+			// copy file content to to http response writer
+			_, err = io.CopyN(w, channel, int64(fileLength))
 
-			for totalBytesRead := 0; totalBytesRead < fileLength; {
-
-				bytesRead, err := channel.Read(readBuf)
-				_, err = writer.Write(readBuf[:bytesRead])
-
-				if err != nil {
-					panic(err)
-				}
-
-				totalBytesRead += bytesRead
+			if err != nil {
+				// just log error for now
+				fmt.Println(err)
 			}
-
-			writer.Flush()
 
 			// respond with zero byte to confirm transfer success
 			channel.Write([]byte{0})
 
-			if err != nil {
-				panic("error reading data")
-			}
+			// tell http request handler that we're finished
+			complete <- true
 		}
 
 	}()
@@ -204,7 +208,7 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 					channel.Close()
 				case "exec":
 					req.Reply(true, nil)
-					go handleScpFileTransfer(channel, _USERS_DATA_ROOT+serverCon.User())
+					go handleScpFileTransfer(channel, serverCon.User())
 				}
 			}
 		}(requests)
@@ -225,12 +229,15 @@ func handleHttpRequest(writer http.ResponseWriter, request *http.Request) {
 	path := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
 
 	if len(path) == 2 {
-		filePath := fmt.Sprintf("%s%s/%s", _USERS_DATA_ROOT, path[0], path[1])
+		filePath := path[0] + "/" + path[1]
 
-		fmt.Fprintf(writer, filePath)
+		if upload, ok := uploadMap[filePath]; ok {
+			upload.writer <- writer
 
-		if _, err := os.Stat(filePath); err == nil {
-
+			<-upload.complete
+			delete(uploadMap, filePath)
+		} else {
+			http.NotFound(writer, request)
 		}
 	} else {
 		http.NotFound(writer, request)
@@ -260,6 +267,10 @@ func main() {
 
 	config.AddHostKey(private)
 
+	uploadMap = make(map[string]Upload)
+
 	go listenSsh(":2222", config)
+
+	// start http server
 	listenHttp(":8080")
 }
