@@ -17,13 +17,20 @@ import (
 )
 
 const (
-	KEYS_DIR              = "keys/"
-	USERS_DIR             = "users/"
-	DEFAULT_SSH_PORT      = ":2222"
-	DEFAULT_HTTP_PORT     = ":8080"
-	DEFAULT_TLS_CERT_PATH = "cert/server.crt"
-	DEFAULT_TLS_KEY_PATH  = "cert/server.key"
-	USE_TLS               = false
+	DEFAULT_SSH_KEY_LOCATION = "keys/id_rsa"
+	USERS_DIR                = "users/"
+	DEFAULT_SSH_PORT         = ":2222"
+	DEFAULT_HTTP_PORT        = ":8080"
+	USE_TLS                  = false
+
+	CONF_FILE              = "ssharing.conf"
+	CONF_SSH_KEY_LOCATION  = "ssh_key_location"
+	CONF_USERS_DIR         = "users_dir_location"
+	CONF_SSH_PORT          = "ssh_port"
+	CONF_HTTP_PORT         = "http_port"
+	CONF_ENABLE_TLS        = "enable_tls"
+	CONF_TLS_CERT_LOCATION = "tls_cert_location"
+	CONF_TLS_KEY_LOCATION  = "tls_key_location"
 )
 
 type Upload struct {
@@ -32,7 +39,49 @@ type Upload struct {
 	complete <-chan bool
 }
 
+type Configuration struct {
+	SshKeyLocation  string
+	UsersDir        string
+	SshPort         string
+	HttpPort        string
+	EnableTls       bool
+	TlsCertLocation string
+	TlsKeyLocation  string
+}
+
 var uploadMap map[string]Upload
+var config Configuration
+
+func loadConfiguration() Configuration {
+	if _, err := os.Stat(CONF_FILE); err == nil {
+		jsonConf, err := ioutil.ReadFile(CONF_FILE)
+
+		if err != nil {
+			panic("Can't parse configuration file")
+		}
+
+		conf := Configuration{}
+
+		err = json.Unmarshal(jsonConf, &conf)
+
+		if err != nil {
+			panic(err)
+		}
+
+		return conf
+	}
+
+	conf := Configuration{SshKeyLocation: DEFAULT_SSH_KEY_LOCATION, UsersDir: USERS_DIR, SshPort: DEFAULT_SSH_PORT, HttpPort: DEFAULT_HTTP_PORT, EnableTls: false}
+
+	jsonConf, _ := json.Marshal(&conf)
+	err := ioutil.WriteFile(CONF_FILE, jsonConf, 0644)
+
+	if err != nil {
+		panic("Failed to create configuration file")
+	}
+
+	return conf
+}
 
 func newUser(name string, pass []byte) {
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
@@ -48,7 +97,7 @@ func newUser(name string, pass []byte) {
 
 	jsonUserData, _ := json.Marshal(userData)
 
-	err = ioutil.WriteFile(USERS_DIR+name, jsonUserData, 0644)
+	err = ioutil.WriteFile(config.UsersDir+name, jsonUserData, 0644)
 
 	if err != nil {
 		panic("Failed to write user data file")
@@ -56,7 +105,7 @@ func newUser(name string, pass []byte) {
 }
 
 func findUser(name string) map[string]string {
-	userFilePath := USERS_DIR + name
+	userFilePath := config.UsersDir + name
 
 	if _, err := os.Stat(userFilePath); err == nil {
 		jsonUserData, err := ioutil.ReadFile(userFilePath)
@@ -223,7 +272,7 @@ func listenHttp(addr string, tls bool) {
 	var err error
 
 	if tls {
-		err = http.ListenAndServeTLS(addr, DEFAULT_TLS_CERT_PATH, DEFAULT_TLS_KEY_PATH, nil)
+		err = http.ListenAndServeTLS(addr, config.TlsCertLocation, config.TlsKeyLocation, nil)
 	} else {
 		err = http.ListenAndServe(addr, nil)
 	}
@@ -253,15 +302,16 @@ func handleHttpRequest(writer http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
-	// prepare directory layout
-	os.Mkdir(KEYS_DIR, 0744)
-	os.Mkdir(USERS_DIR, 0744)
+	config = loadConfiguration()
 
-	config := &ssh.ServerConfig{
+	// prepare directory layout
+	os.Mkdir(config.UsersDir, 0744)
+
+	sshServerConfig := &ssh.ServerConfig{
 		PasswordCallback: passwordCallback,
 	}
 
-	privateBytes, err := ioutil.ReadFile(KEYS_DIR + "id_rsa")
+	privateBytes, err := ioutil.ReadFile(config.SshKeyLocation)
 	if err != nil {
 		panic("Failed to load private key")
 	}
@@ -271,12 +321,12 @@ func main() {
 		panic("Failed to parse private key")
 	}
 
-	config.AddHostKey(private)
+	sshServerConfig.AddHostKey(private)
 
 	uploadMap = make(map[string]Upload)
 
-	go listenSsh(DEFAULT_SSH_PORT, config)
+	go listenSsh(config.SshPort, sshServerConfig)
 
 	// start http server
-	listenHttp(DEFAULT_HTTP_PORT, USE_TLS)
+	listenHttp(config.HttpPort, config.EnableTls)
 }
