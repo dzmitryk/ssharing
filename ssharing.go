@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	_KEYS_DIR  = "keys/"
-	_USERS_DIR = "users/"
+	KEYS_DIR          = "keys/"
+	USERS_DIR         = "users/"
+	DEFAULT_SSH_PORT  = ":2222"
+	DEFAULT_HTTP_PORT = ":8080"
 )
 
 type Upload struct {
@@ -43,7 +45,7 @@ func newUser(name string, pass []byte) {
 
 	jsonUserData, _ := json.Marshal(userData)
 
-	err = ioutil.WriteFile(_USERS_DIR+name, jsonUserData, 0644)
+	err = ioutil.WriteFile(USERS_DIR+name, jsonUserData, 0644)
 
 	if err != nil {
 		panic("Failed to write user data file")
@@ -51,7 +53,7 @@ func newUser(name string, pass []byte) {
 }
 
 func findUser(name string) map[string]string {
-	userFilePath := _USERS_DIR + name
+	userFilePath := USERS_DIR + name
 
 	if _, err := os.Stat(userFilePath); err == nil {
 		jsonUserData, err := ioutil.ReadFile(userFilePath)
@@ -242,16 +244,15 @@ func handleHttpRequest(writer http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
-
 	// prepare directory layout
-	os.Mkdir(_KEYS_DIR, 0744)
-	os.Mkdir(_USERS_DIR, 0744)
+	os.Mkdir(KEYS_DIR, 0744)
+	os.Mkdir(USERS_DIR, 0744)
 
 	config := &ssh.ServerConfig{
 		PasswordCallback: passwordCallback,
 	}
 
-	privateBytes, err := ioutil.ReadFile(_KEYS_DIR + "id_rsa")
+	privateBytes, err := ioutil.ReadFile(KEYS_DIR + "id_rsa")
 	if err != nil {
 		panic("Failed to load private key")
 	}
@@ -265,8 +266,8 @@ func main() {
 
 	uploadMap = make(map[string]Upload)
 
-	go listenSsh(":2222", config)
+	go listenSsh(DEFAULT_SSH_PORT, config)
 
 	// start http server
-	listenHttp(":8080")
+	listenHttp(DEFAULT_HTTP_PORT)
 }
