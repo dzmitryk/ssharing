@@ -17,10 +17,13 @@ import (
 )
 
 const (
-	KEYS_DIR          = "keys/"
-	USERS_DIR         = "users/"
-	DEFAULT_SSH_PORT  = ":2222"
-	DEFAULT_HTTP_PORT = ":8080"
+	KEYS_DIR              = "keys/"
+	USERS_DIR             = "users/"
+	DEFAULT_SSH_PORT      = ":2222"
+	DEFAULT_HTTP_PORT     = ":8080"
+	DEFAULT_TLS_CERT_PATH = "cert/server.crt"
+	DEFAULT_TLS_KEY_PATH  = "cert/server.key"
+	USE_TLS               = false
 )
 
 type Upload struct {
@@ -214,13 +217,19 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 	}
 }
 
-func listenHttp(addr string) {
+func listenHttp(addr string, tls bool) {
 	http.HandleFunc("/", handleHttpRequest)
 
-	err := http.ListenAndServe(addr, nil)
+	var err error
+
+	if tls {
+		err = http.ListenAndServeTLS(addr, DEFAULT_TLS_CERT_PATH, DEFAULT_TLS_KEY_PATH, nil)
+	} else {
+		err = http.ListenAndServe(addr, nil)
+	}
 
 	if err != nil {
-		panic("Couldn't start http server")
+		panic(err)
 	}
 }
 
@@ -269,5 +278,5 @@ func main() {
 	go listenSsh(DEFAULT_SSH_PORT, config)
 
 	// start http server
-	listenHttp(DEFAULT_HTTP_PORT)
+	listenHttp(DEFAULT_HTTP_PORT, USE_TLS)
 }
