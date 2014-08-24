@@ -21,7 +21,6 @@ const (
 	USERS_DIR                = "users/"
 	DEFAULT_SSH_PORT         = ":2222"
 	DEFAULT_HTTP_PORT        = ":8080"
-	USE_TLS                  = false
 
 	CONF_FILE              = "ssharing.conf"
 	CONF_SSH_KEY_LOCATION  = "ssh_key_location"
