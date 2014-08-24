@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -56,7 +56,7 @@ func loadConfiguration() Configuration {
 		jsonConf, err := ioutil.ReadFile(CONF_FILE)
 
 		if err != nil {
-			panic("Can't parse configuration file")
+			log.Fatal("Can't read configuration file", err)
 		}
 
 		conf := Configuration{}
@@ -64,7 +64,7 @@ func loadConfiguration() Configuration {
 		err = json.Unmarshal(jsonConf, &conf)
 
 		if err != nil {
-			panic(err)
+			log.Fatal("Failed to parse configuration file", err)
 		}
 
 		return conf
@@ -76,7 +76,7 @@ func loadConfiguration() Configuration {
 	err := ioutil.WriteFile(CONF_FILE, jsonConf, 0644)
 
 	if err != nil {
-		panic("Failed to create configuration file")
+		log.Panic("Failed to create configuration file", err)
 	}
 
 	return conf
@@ -86,7 +86,7 @@ func newUser(name string, pass []byte) {
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 
 	if err != nil {
-		panic("Failed to generate password hash")
+		log.Panic("Failed to generate password hash", err)
 	}
 
 	userData := map[string]string{
@@ -99,7 +99,7 @@ func newUser(name string, pass []byte) {
 	err = ioutil.WriteFile(config.UsersDir+name, jsonUserData, 0644)
 
 	if err != nil {
-		panic("Failed to write user data file")
+		log.Panic("Failed to write user data file", err)
 	}
 }
 
@@ -110,7 +110,7 @@ func findUser(name string) map[string]string {
 		jsonUserData, err := ioutil.ReadFile(userFilePath)
 
 		if err != nil {
-			panic("Failed to retrieve user information")
+			log.Panic("Failed to retrieve user information", err)
 		}
 
 		var userData map[string]string
@@ -118,7 +118,7 @@ func findUser(name string) map[string]string {
 		err = json.Unmarshal(jsonUserData, &userData)
 
 		if err != nil {
-			panic("Failed to unmarshal user data file")
+			log.Panic("Failed to unmarshal user data file", err)
 		}
 
 		return userData
@@ -156,7 +156,7 @@ func handleScpFileTransfer(channel ssh.Channel, destDir string) error {
 		bytesRead, err := channel.Read(readBuf)
 
 		if err != nil {
-			panic("error reading data")
+			log.Panic("Error reading data", err)
 		}
 
 		cmdLine := strings.Trim(string(readBuf[:bytesRead]), "\n ")
@@ -173,7 +173,7 @@ func handleScpFileTransfer(channel ssh.Channel, destDir string) error {
 			fileLength, err := strconv.Atoi(cmdParts[1])
 
 			if err != nil {
-				panic(err)
+				log.Panic("Can't parse scp command", err)
 			}
 
 			// file name of transferred file
@@ -198,7 +198,7 @@ func handleScpFileTransfer(channel ssh.Channel, destDir string) error {
 
 			if err != nil {
 				// just log error for now
-				fmt.Println(err)
+				log.Println(err)
 			}
 
 			// respond with zero byte to confirm transfer success
@@ -217,14 +217,14 @@ func listenSsh(addr string, config *ssh.ServerConfig) {
 	listener, err := net.Listen("tcp", addr)
 
 	if err != nil {
-		panic("Failed to start listening")
+		log.Panic("Failed to start listening", err)
 	}
 
 	for {
 		conn, err := listener.Accept()
 
 		if err != nil {
-			fmt.Println("Error establishing connection")
+			log.Println("Error establishing connection", err)
 
 			continue
 		}
@@ -237,7 +237,7 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 
 	serverCon, chans, reqs, err := ssh.NewServerConn(conn, config)
 	if err != nil {
-		panic("Handshake failed")
+		log.Panic("Handshake failed", err)
 	}
 
 	go ssh.DiscardRequests(reqs)
@@ -247,7 +247,7 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 		channel, requests, err := newChannel.Accept()
 
 		if err != nil {
-			panic("Error accepting request")
+			log.Panic("Error accepting request", err)
 		}
 
 		go func(in <-chan *ssh.Request) {
@@ -277,7 +277,7 @@ func listenHttp(addr string, tls bool) {
 	}
 
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 
@@ -312,12 +312,12 @@ func main() {
 
 	privateBytes, err := ioutil.ReadFile(config.SshKeyLocation)
 	if err != nil {
-		panic("Failed to load private key")
+		log.Fatal("Failed to load private key", err)
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		panic("Failed to parse private key")
+		log.Fatal("Failed to parse private key", err)
 	}
 
 	sshServerConfig.AddHostKey(private)
