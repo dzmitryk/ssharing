@@ -237,7 +237,8 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 
 	serverCon, chans, reqs, err := ssh.NewServerConn(conn, config)
 	if err != nil {
-		log.Panic("Handshake failed", err)
+		log.Println("Handshake failed", err)
+		return
 	}
 
 	go ssh.DiscardRequests(reqs)
@@ -247,7 +248,8 @@ func handleSshConnection(conn net.Conn, config *ssh.ServerConfig) {
 		channel, requests, err := newChannel.Accept()
 
 		if err != nil {
-			log.Panic("Error accepting request", err)
+			log.Println("Error accepting request", err)
+			return
 		}
 
 		go func(in <-chan *ssh.Request) {
