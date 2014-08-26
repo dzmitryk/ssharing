@@ -6,7 +6,7 @@ Example
 ========
 * Register user: `ssh new-user@ssharing.myhost.com`
 * Send file: `scp file-to-share.txt new-user@ssharing.myhost.com:`
-* Receive file by opening http://ssharing.myhost.com/new-user/file-to-share.txt in your browser
+* Receive file by opening `http://ssharing.myhost.com/new-user/file-to-share.txt` in your browser
 
 How this works?
 ========
@@ -14,4 +14,16 @@ ssharing server is just piping input it receives from scp to an http response. T
 
 Configuration
 ========
-Work in progress...
+JSON configuration file named `ssharing.conf` populated with the defaults is created in the working directory if it doesn't exist. Sample configuration file with all available options is listed below.
+
+```json
+{
+	"SshKeyLocation":"keys/id_rsa",
+	"UsersDir":"users/",
+	"SshPort":":2222",
+	"HttpPort":":8080",
+	"EnableTls":"true",
+	"TlsCertLocation":"cert/server.crt",
+	"TlsKeyLocation":"cert/server.key"
+}
+```
