@@ -10,7 +10,7 @@ Example
 
 How this works?
 ========
-ssharing server is just piping input it receives from scp to an http response. Transferred files are not stored on the server. When scp transfer is initiated it will wait until http request to download the file is received, transfer begins only then. That is, the file is transferred to the first user requested it, for another user to download it `scp` command has to be issued again.
+ssharing server is just piping input it receives from scp request coming from the uploader to an http response on the receiver's side. Transferred files are not stored on the server. When file transfer is initiated, scp will wait for http request to download this file and start the actual transfer only then. That is, the file is transferred to the first user who is requested it, for another user to download it `scp` command has to be issued again.
 
 Configuration
 ========
